@@ -54,6 +54,11 @@ function buildEmptyChords(measures, beats) {
   return Array.from({ length: totalBeats }, () => "");
 }
 
+function buildEmptyChordNotes(measures, beats) {
+  const totalBeats = measures * beats;
+  return Array.from({ length: totalBeats }, () => "");
+}
+
 function App() {
   const nextSectionId = useRef(1);
   const [song, setSong] = useState(DEFAULT_SONG);
@@ -73,6 +78,13 @@ function App() {
     });
     return initial;
   });
+  const [sectionChordNotes, setSectionChordNotes] = useState(() => {
+    const initial = {};
+    DEFAULT_SECTIONS.forEach((section) => {
+      initial[section.id] = buildEmptyChordNotes(section.measures, section.beatsPerMeasure);
+    });
+    return initial;
+  });
 
   const activeSectionData = sections.find((section) => section.id === activeSection) ||
     sections[0];
@@ -85,6 +97,8 @@ function App() {
     buildEmptyGrid(activeMeasures, activeBeatsPerMeasure);
   const activeChords = sectionChords[activeSection] ||
     buildEmptyChords(activeMeasures, activeBeatsPerMeasure);
+  const activeChordNotes = sectionChordNotes[activeSection] ||
+    buildEmptyChordNotes(activeMeasures, activeBeatsPerMeasure);
 
   const beatLabels = useMemo(() => {
     return Array.from({ length: activeTotalBeats }, (_, index) => index + 1);
@@ -153,6 +167,14 @@ function App() {
       next[id] = trimmed;
       return next;
     });
+    setSectionChordNotes((prev) => {
+      const next = { ...prev };
+      const row = next[id] || buildEmptyChordNotes(measures, beatsPerMeasure);
+      const trimmed = row.slice(0, nextTotalBeats);
+      while (trimmed.length < nextTotalBeats) trimmed.push("");
+      next[id] = trimmed;
+      return next;
+    });
   }
 
   function addSection() {
@@ -178,6 +200,10 @@ function App() {
       ...prev,
       [id]: buildEmptyChords(DEFAULT_MEASURES, DEFAULT_BEATS)
     }));
+    setSectionChordNotes((prev) => ({
+      ...prev,
+      [id]: buildEmptyChordNotes(DEFAULT_MEASURES, DEFAULT_BEATS)
+    }));
     setActiveSection(id);
   }
 
@@ -196,6 +222,10 @@ function App() {
       ...prev,
       [newId]: (prev[id] || buildEmptyChords(source.measures, source.beatsPerMeasure)).slice()
     }));
+    setSectionChordNotes((prev) => ({
+      ...prev,
+      [newId]: (prev[id] || buildEmptyChordNotes(source.measures, source.beatsPerMeasure)).slice()
+    }));
     setActiveSection(newId);
   }
 
@@ -208,6 +238,11 @@ function App() {
       return next;
     });
     setSectionChords((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setSectionChordNotes((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
@@ -249,6 +284,17 @@ function App() {
         .slice();
       const cleaned = value.replace(/[^A-Za-z0-9#b/()+%\-]/g, "").slice(0, 8);
       row[beatIndex] = cleaned;
+      next[activeSection] = row;
+      return next;
+    });
+  }
+
+  function handleChordNoteChange(beatIndex, value) {
+    setSectionChordNotes((prev) => {
+      const next = { ...prev };
+      const row = (next[activeSection] ||
+        buildEmptyChordNotes(activeMeasures, activeBeatsPerMeasure)).slice();
+      row[beatIndex] = value.slice(0, 12);
       next[activeSection] = row;
       return next;
     });
@@ -447,6 +493,17 @@ function App() {
                 />
               ))}
             </div>
+            <div className="grid-row">
+              <div className="grid-label">Chord note</div>
+              {activeChordNotes.map((value, beatIndex) => (
+                <input
+                  key={`chord-note-${beatIndex}`}
+                  className="grid-cell grid-cell--chord-note"
+                  value={value}
+                  onChange={(event) => handleChordNoteChange(beatIndex, event.target.value)}
+                />
+              ))}
+            </div>
             {!activeChordOnly && STRING_NAMES.map((stringName, stringIndex) => (
               <div key={stringName} className="grid-row">
                 <div className="grid-label">{stringName}</div>
@@ -492,19 +549,25 @@ function App() {
                   buildEmptyGrid(section.measures, section.beatsPerMeasure);
                 const chords = sectionChords[section.id] ||
                   buildEmptyChords(section.measures, section.beatsPerMeasure);
+                const chordNotes = sectionChordNotes[section.id] ||
+                  buildEmptyChordNotes(section.measures, section.beatsPerMeasure);
                 return (
                   <div key={section.id} className="preview__section">
-                    <h3>
-                      {section.name}
-                      {section.strumPattern ? ` - Strumming ${section.strumPattern}` : ""}
-                    </h3>
-                    <svg
-                      viewBox={`0 0 ${totalBeats * beatWidth + 160} 200`}
-                      width="100%"
-                      height="200"
-                      role="img"
-                      aria-label={`${section.name} tab`}
-                    >
+                    <div className="preview__section-row">
+                      <div className="preview__section-title">
+                        <h3>
+                          {section.name}
+                          {section.strumPattern ? ` - ${section.strumPattern}` : ""}
+                        </h3>
+                      </div>
+                      <div className="preview__section-body">
+                        <svg
+                          viewBox={`0 0 ${totalBeats * beatWidth + 160} ${section.chordOnly ? 100 : 200}`}
+                          width="100%"
+                          height={section.chordOnly ? "100" : "200"}
+                          role="img"
+                          aria-label={`${section.name} tab`}
+                        >
                       {!section.chordOnly && STRING_NAMES.map((_, stringIndex) => {
                         const y = 34 + stringIndex * 30;
                         return (
@@ -528,9 +591,9 @@ function App() {
                           <line
                             key={`measure-${index}`}
                             x1={x}
-                            y1="54"
+                            y1="28"
                             x2={x}
-                            y2="122"
+                            y2="80"
                             stroke="#d5c3a6"
                             strokeWidth="1"
                           />
@@ -539,7 +602,7 @@ function App() {
                       {chords.map((value, beatIndex) => {
                         if (!value) return null;
                         const cellCenterX = 60 + beatIndex * beatWidth + beatWidth / 2;
-                        const chordY = section.chordOnly ? 93 : 20;
+                        const chordY = section.chordOnly ? 54 : 20;
                         const chordTextLength = 32;
                         const shouldShrinkChord = section.chordOnly && value.length > 3;
                         return (
@@ -553,6 +616,24 @@ function App() {
                             textAnchor="middle"
                             lengthAdjust={shouldShrinkChord ? "spacingAndGlyphs" : undefined}
                             textLength={shouldShrinkChord ? chordTextLength : undefined}
+                          >
+                            {value}
+                          </text>
+                        );
+                      })}
+                      {chordNotes.map((value, beatIndex) => {
+                        if (!value) return null;
+                        const cellCenterX = 60 + beatIndex * beatWidth + beatWidth / 2;
+                        const noteY = section.chordOnly ? 72 : 36;
+                        return (
+                          <text
+                            key={`chord-note-${beatIndex}`}
+                            x={cellCenterX}
+                            y={noteY}
+                            fontFamily="monospace"
+                            fontSize={section.chordOnly ? "12" : "11"}
+                            fill="#6b4b1e"
+                            textAnchor="middle"
                           >
                             {value}
                           </text>
@@ -610,16 +691,21 @@ function App() {
                           {name}
                         </text>
                       ))}
-                      <text
-                        x={totalBeats * beatWidth + 90}
-                        y="100"
-                        fontFamily="monospace"
-                        fontSize="25"
-                        fill="#111"
-                      >
-                        x{section.repeats}
-                      </text>
-                    </svg>
+                      {section.repeats > 1 && (
+                        <text
+                          x={totalBeats * beatWidth + 90}
+                          y={section.chordOnly ? "54" : "100"}
+                          fontFamily="monospace"
+                          fontSize="25"
+                          fill="#111"
+                        >
+                          x{section.repeats}
+                        </text>
+                      )}
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="preview__divider" aria-hidden="true" />
                   </div>
                 );
               })}
