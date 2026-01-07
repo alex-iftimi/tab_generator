@@ -36,7 +36,10 @@ const DEFAULT_SONG = {
   artist: "",
   tuning: "Standard (EADGBE)",
   tempo: 120,
-  timeSignature: "4/4"
+  timeSignature: "4/4",
+  strumPattern: "",
+  originalLink: "",
+  tabsLink: ""
 };
 
 const DEFAULT_MEASURES = 8;
@@ -61,9 +64,11 @@ function buildEmptyChordNotes(measures, beats) {
 
 function App() {
   const nextSectionId = useRef(1);
+  const fileInputRef = useRef(null);
   const [song, setSong] = useState(DEFAULT_SONG);
   const [sections, setSections] = useState(DEFAULT_SECTIONS);
   const [activeSection, setActiveSection] = useState("intro");
+  const [expandedSections, setExpandedSections] = useState({});
   const [sectionTabs, setSectionTabs] = useState(() => {
     const initial = {};
     DEFAULT_SECTIONS.forEach((section) => {
@@ -138,6 +143,13 @@ function App() {
         section.id === id ? { ...section, strumPattern } : section
       )
     );
+  }
+
+  function toggleSectionDetails(id) {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
   }
 
   function updateSectionTiming(id, measures, beatsPerMeasure) {
@@ -300,7 +312,59 @@ function App() {
     });
   }
 
-  const exportTitle = `${song.title}${song.artist ? " - " + song.artist : ""}`;
+  const exportTitle = `${song.artist}${song.title ? " - " + song.title : ""}`.trim();
+
+  function buildSongData() {
+    return {
+      version: 1,
+      song,
+      sections,
+      sectionTabs,
+      sectionChords,
+      sectionChordNotes
+    };
+  }
+
+  function handleExportJson() {
+    const data = buildSongData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const safeTitle = song.title ? song.title.replace(/[^A-Za-z0-9_-]/g, "_") : "song";
+    link.download = `${safeTitle}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportJson(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || "{}"));
+        if (!parsed || typeof parsed !== "object") return;
+        if (parsed.song) setSong(parsed.song);
+        if (Array.isArray(parsed.sections)) setSections(parsed.sections);
+        if (parsed.sectionTabs) setSectionTabs(parsed.sectionTabs);
+        if (parsed.sectionChords) setSectionChords(parsed.sectionChords);
+        if (parsed.sectionChordNotes) setSectionChordNotes(parsed.sectionChordNotes);
+        const lastId = (parsed.sections || [])
+          .map((section) => section.id)
+          .filter((id) => typeof id === "string" && id.startsWith("section-"))
+          .map((id) => Number(id.replace("section-", "")))
+          .filter((num) => !Number.isNaN(num))
+          .sort((a, b) => b - a)[0];
+        if (lastId) nextSectionId.current = lastId + 1;
+        if (parsed.sections?.[0]?.id) setActiveSection(parsed.sections[0].id);
+      } catch {
+        return;
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
 
   return (
     <div className="app">
@@ -309,9 +373,24 @@ function App() {
           <h1>Tab Generator</h1>
           <p className="muted">Build your song tabs and export to PDF.</p>
         </div>
-        <button className="primary" onClick={() => window.print()}>
-          Print / Save PDF
-        </button>
+        <div className="header-actions">
+          <button className="secondary" onClick={handleExportJson}>
+            Export JSON
+          </button>
+          <button className="secondary" onClick={() => fileInputRef.current?.click()}>
+            Import JSON
+          </button>
+          <button className="primary" onClick={() => window.print()}>
+            Print / Save PDF
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="file-input"
+            onChange={handleImportJson}
+          />
+        </div>
       </header>
 
       <main className="app__main">
@@ -360,6 +439,33 @@ function App() {
                 onChange={(event) => updateSongField("timeSignature", event.target.value)}
               />
             </label>
+            <label>
+              Global strumming
+              <input
+                type="text"
+                placeholder="D D U D U"
+                value={song.strumPattern}
+                onChange={(event) => updateSongField("strumPattern", event.target.value)}
+              />
+            </label>
+            <label>
+              Original song link
+              <input
+                type="url"
+                placeholder="https://"
+                value={song.originalLink}
+                onChange={(event) => updateSongField("originalLink", event.target.value)}
+              />
+            </label>
+            <label>
+              Useful tabs link
+              <input
+                type="url"
+                placeholder="https://"
+                value={song.tabsLink}
+                onChange={(event) => updateSongField("tabsLink", event.target.value)}
+              />
+            </label>
             <div className="form-note">
               Measures and beats per section are set below.
             </div>
@@ -394,74 +500,85 @@ function App() {
                     }
                   />
                 </label>
-                <label className="section-timing">
-                  Measures
-                  <input
-                    type="number"
-                    min="1"
-                    max="32"
-                    value={section.measures}
-                    onChange={(event) =>
-                      updateSectionTiming(
-                        section.id,
-                        Number(event.target.value),
-                        section.beatsPerMeasure
-                      )
-                    }
-                  />
-                </label>
+                <button
+                  className="section-toggle-btn"
+                  onClick={() => toggleSectionDetails(section.id)}
+                  type="button"
+                >
+                  {expandedSections[section.id] ? "Hide" : "Details"}
+                </button>
+                {expandedSections[section.id] && (
+                  <div className="section-details">
+                    <label className="section-timing">
+                      Measures
+                      <input
+                        type="number"
+                        min="1"
+                        max="32"
+                        value={section.measures}
+                        onChange={(event) =>
+                          updateSectionTiming(
+                            section.id,
+                            Number(event.target.value),
+                            section.beatsPerMeasure
+                          )
+                        }
+                      />
+                    </label>
                 <label className="section-timing">
                   Beats / Measure
                   <input
                     type="number"
                     min="1"
-                    max="12"
+                    max="50"
                     value={section.beatsPerMeasure}
                     onChange={(event) =>
                       updateSectionTiming(
                         section.id,
                         section.measures,
-                        Number(event.target.value)
-                      )
-                    }
-                  />
-                </label>
-                <label className="section-toggle">
-                  Chord-only
-                  <input
-                    type="checkbox"
-                    checked={section.chordOnly}
-                    onChange={(event) =>
-                      updateSectionChordOnly(section.id, event.target.checked)
-                    }
-                  />
-                </label>
-                <label className="section-strum">
-                  Strumming
-                  <input
-                    type="text"
-                    placeholder="D D U D U"
-                    value={section.strumPattern}
-                    onChange={(event) =>
-                      updateSectionStrumPattern(section.id, event.target.value)
-                    }
-                  />
-                </label>
-                <div className="section-actions">
-                  <button onClick={() => moveSection(section.id, "up")} disabled={index === 0}>
-                    Up
-                  </button>
-                  <button
-                    onClick={() => moveSection(section.id, "down")}
-                    disabled={index === sections.length - 1}
-                  >
-                    Down
-                  </button>
-                  <button onClick={() => duplicateSection(section.id)}>Duplicate</button>
-                  <button onClick={() => deleteSection(section.id)} disabled={sections.length <= 1}>
-                    Delete
-                  </button>
-                </div>
+                            Number(event.target.value)
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="section-toggle">
+                      Chord-only
+                      <input
+                        type="checkbox"
+                        checked={section.chordOnly}
+                        onChange={(event) =>
+                          updateSectionChordOnly(section.id, event.target.checked)
+                        }
+                      />
+                    </label>
+                    <label className="section-strum">
+                      Strumming
+                      <input
+                        type="text"
+                        placeholder="D D U D U"
+                        value={section.strumPattern}
+                        onChange={(event) =>
+                          updateSectionStrumPattern(section.id, event.target.value)
+                        }
+                      />
+                    </label>
+                    <div className="section-actions">
+                      <button onClick={() => moveSection(section.id, "up")} disabled={index === 0}>
+                        Up
+                      </button>
+                      <button
+                        onClick={() => moveSection(section.id, "down")}
+                        disabled={index === sections.length - 1}
+                      >
+                        Down
+                      </button>
+                      <button onClick={() => duplicateSection(section.id)}>Duplicate</button>
+                      <button onClick={() => deleteSection(section.id)} disabled={sections.length <= 1}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -494,7 +611,7 @@ function App() {
               ))}
             </div>
             <div className="grid-row">
-              <div className="grid-label">Chord note</div>
+              <div className="grid-label">Note</div>
               {activeChordNotes.map((value, beatIndex) => (
                 <input
                   key={`chord-note-${beatIndex}`}
@@ -504,6 +621,7 @@ function App() {
                 />
               ))}
             </div>
+            <div className="grid-divider" />
             {!activeChordOnly && STRING_NAMES.map((stringName, stringIndex) => (
               <div key={stringName} className="grid-row">
                 <div className="grid-label">{stringName}</div>
@@ -531,66 +649,88 @@ function App() {
                 <p>
                   Tuning: {song.tuning} | Tempo: {song.tempo} BPM | Time: {song.timeSignature}
                 </p>
-              </div>
-              <div className="preview__meta">
-                {sections.map((section) => (
-                  <div key={section.id}>
-                    {section.name} x {section.repeats}
+                {(song.originalLink || song.tabsLink) && (
+                  <div className="preview__links">
+                    {song.originalLink && (
+                      <a href={song.originalLink} target="_blank" rel="noreferrer">
+                        Original song
+                      </a>
+                    )}
+                    {song.tabsLink && (
+                      <a href={song.tabsLink} target="_blank" rel="noreferrer">
+                        Useful tabs
+                      </a>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             <div className="preview__sections">
               {sections.map((section) => {
                 const totalBeats = section.measures * section.beatsPerMeasure;
-                const beatWidth = section.chordOnly ? 69 : 46;
+                const baseBeatWidth = section.chordOnly ? 69 : 46;
                 const grid = sectionTabs[section.id] ||
                   buildEmptyGrid(section.measures, section.beatsPerMeasure);
                 const chords = sectionChords[section.id] ||
                   buildEmptyChords(section.measures, section.beatsPerMeasure);
                 const chordNotes = sectionChordNotes[section.id] ||
                   buildEmptyChordNotes(section.measures, section.beatsPerMeasure);
+                const beatWidths = section.chordOnly
+                  ? Array.from({ length: totalBeats }, () => baseBeatWidth)
+                  : Array.from({ length: totalBeats }, (_, beatIndex) => {
+                      const hasNote = grid.some((row) => (row[beatIndex] || "").trim() !== "");
+                      return hasNote ? baseBeatWidth : baseBeatWidth * 0.25;
+                    });
+                const beatOffsets = [];
+                let runningX = 0;
+                beatWidths.forEach((width) => {
+                  beatOffsets.push(runningX);
+                  runningX += width;
+                });
+                const totalWidth = runningX;
                 return (
                   <div key={section.id} className="preview__section">
                     <div className="preview__section-row">
                       <div className="preview__section-title">
                         <h3>
                           {section.name}
-                          {section.strumPattern ? ` - ${section.strumPattern}` : ""}
+                          {(section.strumPattern || song.strumPattern)
+                            ? ` - ${section.strumPattern || song.strumPattern}`
+                            : ""}
                         </h3>
                       </div>
                       <div className="preview__section-body">
                         <svg
-                          viewBox={`0 0 ${totalBeats * beatWidth + 160} ${section.chordOnly ? 100 : 200}`}
+                          viewBox={`0 0 ${totalWidth + 160} ${section.chordOnly ? 100 : 200}`}
                           width="100%"
                           height={section.chordOnly ? "100" : "200"}
                           role="img"
                           aria-label={`${section.name} tab`}
                         >
-                      {!section.chordOnly && STRING_NAMES.map((_, stringIndex) => {
-                        const y = 34 + stringIndex * 30;
-                        return (
-                          <line
-                            key={stringIndex}
-                            x1="60"
-                            y1={y}
-                            x2={totalBeats * 46 + 60}
-                            y2={y}
-                            stroke="#111"
-                            strokeOpacity="0.55"
-                            strokeWidth="1"
-                            strokeDasharray="4 4"
-                          />
-                        );
-                      })}
-                      {section.chordOnly && Array.from({ length: section.measures + 1 }, (_, index) => {
-                        const measureWidth = section.beatsPerMeasure * beatWidth;
-                        const x = 60 + index * measureWidth;
-                        return (
-                          <line
-                            key={`measure-${index}`}
-                            x1={x}
+                          {!section.chordOnly && STRING_NAMES.map((_, stringIndex) => {
+                            const y = 34 + stringIndex * 30;
+                            return (
+                              <line
+                                key={stringIndex}
+                                x1="60"
+                                y1={y}
+                                x2={totalWidth + 60}
+                                y2={y}
+                                stroke="#111"
+                                strokeOpacity="0.55"
+                                strokeWidth="1"
+                                strokeDasharray="4 4"
+                              />
+                            );
+                          })}
+                          {section.chordOnly && Array.from({ length: section.measures + 1 }, (_, index) => {
+                            const measureWidth = section.beatsPerMeasure * baseBeatWidth;
+                            const x = 60 + index * measureWidth;
+                            return (
+                              <line
+                                key={`measure-${index}`}
+                                x1={x}
                             y1="28"
                             x2={x}
                             y2="80"
@@ -599,14 +739,14 @@ function App() {
                           />
                         );
                       })}
-                      {chords.map((value, beatIndex) => {
-                        if (!value) return null;
-                        const cellCenterX = 60 + beatIndex * beatWidth + beatWidth / 2;
-                        const chordY = section.chordOnly ? 54 : 20;
-                        const chordTextLength = 32;
-                        const shouldShrinkChord = section.chordOnly && value.length > 3;
-                        return (
-                          <text
+                          {chords.map((value, beatIndex) => {
+                            if (!value) return null;
+                            const cellCenterX = 60 + beatOffsets[beatIndex] + beatWidths[beatIndex] / 2;
+                            const chordY = section.chordOnly ? 54 : 20;
+                            const chordTextLength = 32;
+                            const shouldShrinkChord = section.chordOnly && value.length > 3;
+                            return (
+                              <text
                             key={`chord-${beatIndex}`}
                             x={cellCenterX}
                             y={chordY}
@@ -621,14 +761,14 @@ function App() {
                           </text>
                         );
                       })}
-                      {chordNotes.map((value, beatIndex) => {
-                        if (!value) return null;
-                        const cellCenterX = 60 + beatIndex * beatWidth + beatWidth / 2;
-                        const noteY = section.chordOnly ? 72 : 36;
-                        return (
-                          <text
-                            key={`chord-note-${beatIndex}`}
-                            x={cellCenterX}
+                          {chordNotes.map((value, beatIndex) => {
+                            if (!value) return null;
+                            const cellCenterX = 60 + beatOffsets[beatIndex] + beatWidths[beatIndex] / 2;
+                            const noteY = section.chordOnly ? 72 : 36;
+                            return (
+                              <text
+                                key={`chord-note-${beatIndex}`}
+                                x={cellCenterX}
                             y={noteY}
                             fontFamily="monospace"
                             fontSize={section.chordOnly ? "12" : "11"}
@@ -639,13 +779,13 @@ function App() {
                           </text>
                         );
                       })}
-                      {!section.chordOnly && grid[0].map((_, beatIndex) => {
-                        const x = 60 + beatIndex * beatWidth;
-                        return (
-                          <line
-                            key={beatIndex}
-                            x1={x}
-                            y1="20"
+                          {!section.chordOnly && grid[0].map((_, beatIndex) => {
+                            const x = 60 + beatOffsets[beatIndex];
+                            return (
+                              <line
+                                key={beatIndex}
+                                x1={x}
+                                y1="20"
                             x2={x}
                             y2="180"
                             stroke={beatIndex % section.beatsPerMeasure === 0 ? "#111" : "#ccc"}
@@ -653,26 +793,32 @@ function App() {
                           />
                         );
                       })}
-                      {!section.chordOnly && STRING_NAMES.map((_, stringIndex) =>
-                        grid[stringIndex].map((value, beatIndex) => {
-                          if (!value) return null;
-                          const x = 72 + beatIndex * beatWidth;
-                          const y = 38 + stringIndex * 30;
-                          return (
-                            <g key={`${stringIndex}-${beatIndex}`}>
-                              <rect
-                                x={x - 6}
-                                y={y - 16}
-                                width={28}
-                                height={20}
-                                fill="#ffffff"
-                              />
+                          {!section.chordOnly && STRING_NAMES.map((_, stringIndex) =>
+                            grid[stringIndex].map((value, beatIndex) => {
+                              if (!value) return null;
+                              const x = 60 + beatOffsets[beatIndex] + beatWidths[beatIndex] / 2;
+                              const y = 38 + stringIndex * 30;
+                              const noteCharCount = String(value).length;
+                              const noteBgWidth = Math.min(
+                                beatWidths[beatIndex] * 0.9,
+                                Math.max(22, noteCharCount * 9 + 10)
+                              );
+                              return (
+                                <g key={`${stringIndex}-${beatIndex}`}>
+                                  <rect
+                                    x={x - noteBgWidth / 2}
+                                    y={y - 16}
+                                    width={noteBgWidth}
+                                    height={20}
+                                    fill="#ffffff"
+                                  />
                               <text
                                 x={x}
                                 y={y}
                                 fontFamily="monospace"
                                 fontSize="18"
                                 fill="#111"
+                                textAnchor="middle"
                               >
                                 {value}
                               </text>
@@ -692,12 +838,12 @@ function App() {
                         </text>
                       ))}
                       {section.repeats > 1 && (
-                        <text
-                          x={totalBeats * beatWidth + 90}
-                          y={section.chordOnly ? "54" : "100"}
-                          fontFamily="monospace"
-                          fontSize="25"
-                          fill="#111"
+                          <text
+                            x={totalWidth + 90}
+                            y={section.chordOnly ? "54" : "100"}
+                            fontFamily="monospace"
+                            fontSize="25"
+                            fill="#111"
                         >
                           x{section.repeats}
                         </text>

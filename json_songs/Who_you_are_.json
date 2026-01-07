@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "song": {
+    "title": "Who you are ",
+    "artist": "Mihail",
+    "tuning": "Standard (EADGBE)",
+    "tempo": 140,
+    "timeSignature": "4/4",
+    "originalLink": "https://www.youtube.com/watch?v=eXBBmJTFuYs&list=RDeXBBmJTFuYs&start_radio=1"
+  },
+  "sections": [
+    {
+      "id": "intro",
+      "name": "Intro",
+      "repeats": 1,
+      "measures": 4,
+      "beatsPerMeasure": 1,
+      "chordOnly": true,
+      "strumPattern": "TBD"
+    },
+    {
+      "id": "section-9",
+      "name": "Chords",
+      "repeats": 1,
+      "measures": 1,
+      "beatsPerMeasure": 4,
+      "chordOnly": false,
+      "strumPattern": ""
+    }
+  ],
+  "sectionTabs": {
+    "intro": [
+      [
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        ""
+      ]
+    ],
+    "section-9": [
+      [
+        "",
+        "2",
+        "",
+        ""
+      ],
+      [
+        "",
+        "",
+        "3",
+        ""
+      ],
+      [
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "",
+        "",
+        "",
+        "4"
+      ],
+      [
+        "",
+        "",
+        "",
+        "x"
+      ],
+      [
+        "",
+        "",
+        "",
+        "x"
+      ]
+    ]
+  },
+  "sectionChords": {
+    "intro": [
+      "D",
+      "Em",
+      "Bm",
+      "%"
+    ],
+    "section-9": [
+      "Bm",
+      "",
+      "",
+      ""
+    ]
+  },
+  "sectionChordNotes": {
+    "intro": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "section-9": [
+      "",
+      "",
+      "",
+      ""
+    ]
+  }
+}

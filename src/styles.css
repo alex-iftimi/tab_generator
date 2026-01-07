@@ -60,6 +60,31 @@ body {
   opacity: 0.9;
 }
 
+.secondary {
+  border: 1px solid #c9bfae;
+  background: #fffaf2;
+  color: #191919;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary:hover {
+  opacity: 0.9;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.file-input {
+  display: none;
+}
+
 .app__main {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.4fr);
@@ -177,6 +202,20 @@ input {
   margin-left: auto;
 }
 
+.section-toggle-btn {
+  border: 1px solid #c9bfae;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.section-details {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
 .section-actions button {
   flex: 0 1 auto;
   max-width: 140px;
@@ -235,6 +274,12 @@ input {
   border-radius: 12px;
   border: 1px solid #d9cfbd;
   background: #fff;
+}
+
+.grid-divider {
+  height: 1px;
+  background: #e7dcc7;
+  margin: 4px 0;
 }
 
 .grid-wrapper--chord-only .grid-label {
@@ -344,6 +389,18 @@ input {
 .preview__meta {
   font-size: 0.85rem;
   text-align: right;
+}
+
+.preview__links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.preview__links a {
+  color: #191919;
+  text-decoration: underline;
 }
 
 .preview__sections {
